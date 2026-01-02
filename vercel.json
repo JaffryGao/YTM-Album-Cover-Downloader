@@ -3,16 +3,20 @@
         {
             "src": "api/*.py",
             "use": "@vercel/python"
-        }
-    ],
-    "rewrites": [
-        {
-            "source": "/api/(.*)",
-            "destination": "/api/$1"
         },
         {
-            "source": "/(.*)",
-            "destination": "/index.html"
+            "src": "index.html",
+            "use": "@vercel/static"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "/api/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
         }
     ]
 }
