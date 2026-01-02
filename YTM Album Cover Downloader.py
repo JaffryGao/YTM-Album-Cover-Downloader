@@ -6,7 +6,7 @@ from ytmusicapi import YTMusic
 
 # ================= 配置区域 =================
 # 1. 你的 Playlist ID
-PLAYLIST_ID = "PL4Imxo1_zxCYYO1K0Lmxv48hfSS1CM90p" 
+PLAYLIST_ID = "yourPlayList" 
 
 # 2. 图片保存路径
 SAVE_DIR = os.path.expanduser("~/Pictures/YTM_Covers")
