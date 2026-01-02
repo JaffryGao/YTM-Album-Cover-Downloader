@@ -1,56 +1,87 @@
 # YTM Album Cover Downloader
 
-这个脚本可以帮助你从 YouTube Music 播放列表中批量提取**高清专辑封面**，并以 `歌手 - 专辑名.jpg` 的格式保存到本地。非常适合用来制作壁纸、屏保或整理音乐收藏。
+从 YouTube Music 播放列表批量下载高清专辑封面（2048x2048），完美适配 macOS 锁屏屏保。
 
-### 🛠️ 环境准备
+![Preview](https://img.shields.io/badge/status-live-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue)
 
-在运行脚本之前，请确保你的电脑已安装 **Python 3.6+**。
+## ✨ 在线使用
 
-1. **安装依赖库**： 打开终端或命令行，运行：
+👉 **[立即访问 Web 应用](https://ytm-album-cover-downloader.vercel.app)**
 
-   Bash
+1. 打开上方链接
+2. 粘贴你的 **公开** YouTube Music 播放列表链接
+3. 点击"下载"按钮
+4. 等待下载完成，获得 `ytm-album-covers.zip` 压缩包
 
-   ```
-   pip install ytmusicapi requests
-   ```
+> ⚠️ 仅支持公开播放列表。私人播放列表需要登录认证，暂不支持。
 
-2. **(可选) 获取认证文件**： 如果你想下载**私人播放列表**或**库中的音乐**，需要导出 YouTube Music 的 Cookie 认证信息：
+---
 
-   - 在 Chrome 浏览器中登录 [YouTube Music](https://music.youtube.com/)。
-   - 按 `F12` 打开开发者工具，切换到 **Network** 选项卡。
-   - 刷新页面，找到一个名为 `browse` 的请求，右键点击它 -> **Copy** -> **Copy as cURL (bash)**。
-   - 在你的电脑上运行 `ytmusicapi setup` 并粘贴刚才复制的内容，它会生成一个 `headers_auth.json`。
+## 🖥️ 设置 Mac 专辑墙屏保
 
-### ⚙️ 配置脚本
+下载完成后，按以下步骤设置你的锁屏屏保：
 
-在脚本开头的 `配置区域` 修改以下三个参数：
+1. 解压 `ytm-album-covers.zip` 到 `~/Pictures/YTM_Covers/` 文件夹
+2. 打开 **系统设置** → **屏幕保护程序**
+3. 选择「随机显示照片」或「照片网格」风格
+4. 点击「选取文件夹」，选择刚才解压的文件夹
+5. 享受你的专辑墙！ 🎉
 
-- **`PLAYLIST_ID`**: 播放列表的 ID（在浏览器地址栏 `list=` 后面那一串字符）。
-- **`SAVE_DIR`**: 你想把图片存到哪个文件夹。
-- **`AUTH_FILE`**: 刚才生成的 `headers_auth.json` 的存放路径（如果只是下载公开列表，可以忽略此项，脚本会自动切换到“访客模式”）。
+---
 
-### 🚀 运行方法
+## 🛠️ 本地开发
 
-在终端执行：
+### 环境要求
 
-Bash
+- Python 3.9+
+- Node.js 18+ (用于 Vercel CLI)
+
+### 安装依赖
+
+```bash
+pip install ytmusicapi
+npm i -g vercel
+```
+
+### 本地运行
+
+```bash
+vercel dev
+```
+
+访问 `http://localhost:3000` 查看效果。
+
+---
+
+## 📁 项目结构
 
 ```
-python your_script_name.py
+├── index.html          # 前端单页应用
+├── api/
+│   ├── playlist.py     # 获取播放列表 API
+│   └── proxy.py        # 图片代理 API (绕过 CORS)
+├── vercel.json         # Vercel 部署配置
+├── requirements.txt    # Python 依赖
+└── YTM Album Cover Downloader.py  # 原始命令行版本
 ```
 
-### 📂 输出效果
+---
 
-脚本运行后，你会得到一个干净的文件夹，里面的文件如下：
+## 🚀 一键部署
 
-- `周杰伦 - 范特西.jpg`
-- `Taylor Swift - 1989.jpg`
-- ... (均为 2048x2048 分辨率)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FJaffryGao%2FYTM-Album-Cover-Downloader)
 
-------
+---
 
-## 💡 注意事项
+## 📝 许可证
 
-1. **公开性**：如果你不使用 `AUTH_FILE`（访客模式），请确保你的播放列表在 YouTube Music 中设置为“公开”或“拥有链接者可看”。
-2. **网络环境**：在中国大陆使用时，你需要开启代理环境，否则无法连接到 YouTube。
-3. **文件清理**：脚本内置了简单的文件名清洗功能，会自动剔除文件名中的特殊非法字符，防止在 Windows 上报错。
+MIT License © 2024
+
+---
+
+## 💡 致谢
+
+- [ytmusicapi](https://github.com/sigma67/ytmusicapi) - YouTube Music API 封装
+- [JSZip](https://stuk.github.io/jszip/) - 浏览器端 ZIP 打包
+- [Tailwind CSS](https://tailwindcss.com/) - UI 样式框架
+- [Alpine.js](https://alpinejs.dev/) - 轻量级响应式框架

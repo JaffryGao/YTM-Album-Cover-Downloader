@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en" x-data="app()" :class="lang">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title x-text="t.title">YTM Album Cover Downloader</title>
+    <meta name="description" :content="t.metaDesc">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- JSZip -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    
+    <!-- FileSaver -->
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@300;400&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'heading-en': ['Instrument Serif', 'serif'],
+                        'body-en': ['Instrument Sans', 'sans-serif'],
+                        'heading-cn': ['Noto Serif SC', 'serif'],
+                        'body-cn': ['Noto Sans SC', 'sans-serif'],
+                        'mono': ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        'glow': {
+                            'indigo': 'rgba(99, 102, 241, 0.15)',
+                            'purple': 'rgba(168, 85, 247, 0.1)',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s ease-out forwards',
+                        'slide-up': 'slideUp 0.8s ease-out forwards',
+                        'pulse-glow': 'pulseGlow 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(30px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { opacity: '0.4' },
+                            '50%': { opacity: '0.8' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* 动态字体映射 */
+        .en .heading { font-family: 'Instrument Serif', serif; font-style: italic; }
+        .en .body { font-family: 'Instrument Sans', sans-serif; }
+        .cn .heading { font-family: 'Noto Serif SC', serif; font-weight: 300; }
+        .cn .body { font-family: 'Noto Sans SC', sans-serif; }
+        
+        /* 背景网格 */
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        
+        /* 光晕效果 */
+        .glow-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+        }
+        
+        /* 滚动动画 */
+        .scroll-animate {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .scroll-animate.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* 毛玻璃卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* 进度条动画 */
+        .progress-bar {
+            background: linear-gradient(90deg, #6366f1, #a855f7, #6366f1);
+            background-size: 200% 100%;
+            animation: shimmer 2s linear infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* 歌曲项动画 */
+        .track-item {
+            animation: slideIn 0.4s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* 隐藏滚动条 */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+
+<body class="bg-zinc-950 text-white min-h-screen body bg-grid overflow-x-hidden">
+    <!-- 背景光晕 -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="glow-orb w-[600px] h-[600px] bg-glow-indigo -top-40 -left-40 animate-pulse-glow"></div>
+        <div class="glow-orb w-[500px] h-[500px] bg-glow-purple top-1/2 -right-40 animate-pulse-glow" style="animation-delay: 1.5s;"></div>
+    </div>
+    
+    <!-- 导航栏 -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass-card border-t-0 border-l-0 border-r-0">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <i data-lucide="disc-3" class="w-5 h-5"></i>
+                </div>
+                <span class="font-semibold text-lg" x-text="t.brand">YTM Covers</span>
+            </div>
+            
+            <!-- 语言切换 -->
+            <button 
+                @click="toggleLang()" 
+                class="px-3 py-1.5 rounded-full glass-card hover:bg-white/10 transition-all text-sm font-medium flex items-center gap-2"
+            >
+                <i data-lucide="globe" class="w-4 h-4"></i>
+                <span x-text="lang === 'en' ? '中文' : 'EN'"></span>
+            </button>
+        </div>
+    </nav>
+    
+    <!-- Hero 区域 -->
+    <main class="relative pt-32 pb-20">
+        <div class="max-w-4xl mx-auto px-6">
+            <!-- 标题 -->
+            <div class="text-center mb-12 animate-fade-in">
+                <h1 class="heading text-5xl md:text-6xl lg:text-7xl mb-6 leading-tight" x-text="t.headline">
+                    Album Art for Your Desktop
+                </h1>
+                <p class="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed" x-text="t.subheadline">
+                    Download high-resolution album covers from your YouTube Music playlists. Perfect for macOS screensavers.
+                </p>
+            </div>
+            
+            <!-- 输入卡片 -->
+            <div class="glass-card rounded-2xl p-8 mb-8 animate-slide-up" style="animation-delay: 0.2s;">
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="flex-1 relative">
+                        <i data-lucide="link" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500"></i>
+                        <input 
+                            type="text" 
+                            x-model="playlistInput"
+                            :placeholder="t.placeholder"
+                            @keyup.enter="fetchPlaylist()"
+                            class="w-full pl-12 pr-4 py-4 bg-zinc-900/50 border border-white/10 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        >
+                    </div>
+                    <button 
+                        @click="fetchPlaylist()"
+                        :disabled="loading"
+                        class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
+                    >
+                        <template x-if="!loading">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="download" class="w-5 h-5"></i>
+                                <span x-text="t.downloadBtn">Download</span>
+                            </span>
+                        </template>
+                        <template x-if="loading">
+                            <span class="flex items-center gap-2">
+                                <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                <span x-text="t.processing">Processing...</span>
+                            </span>
+                        </template>
+                    </button>
+                </div>
+                
+                <!-- 提示 -->
+                <p class="text-zinc-500 text-sm mt-4 flex items-center gap-2">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                    <span x-text="t.hint"></span>
+                </p>
+            </div>
+            
+            <!-- 错误提示 -->
+            <div x-show="error" x-cloak class="glass-card rounded-xl p-4 mb-8 border-red-500/30 bg-red-500/10">
+                <p class="text-red-400 flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                    <span x-text="error"></span>
+                </p>
+            </div>
+            
+            <!-- 结果区域 -->
+            <div x-show="tracks.length > 0 || downloading" x-cloak class="glass-card rounded-2xl p-8 animate-slide-up">
+                <!-- 播放列表名称 -->
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="heading text-2xl" x-text="playlistName"></h2>
+                    <span class="text-zinc-400 text-sm" x-text="`${tracks.length} ${t.albums}`"></span>
+                </div>
+                
+                <!-- 进度条 -->
+                <div x-show="downloading" class="mb-6">
+                    <div class="flex items-center justify-between text-sm mb-2">
+                        <span class="text-zinc-400" x-text="t.downloading"></span>
+                        <span class="text-indigo-400" x-text="`${downloadProgress}%`"></span>
+                    </div>
+                    <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                        <div class="progress-bar h-full rounded-full transition-all duration-300" :style="`width: ${downloadProgress}%`"></div>
+                    </div>
+                    <p class="text-zinc-500 text-sm mt-3 flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+                        <span x-text="t.doNotClose"></span>
+                    </p>
+                </div>
+                
+                <!-- 歌曲列表 -->
+                <div class="max-h-80 overflow-y-auto hide-scrollbar space-y-2">
+                    <template x-for="(track, index) in tracks" :key="index">
+                        <div class="track-item flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-all" :style="`animation-delay: ${index * 50}ms`">
+                            <img :src="track.thumbnail" class="w-12 h-12 rounded-lg object-cover bg-zinc-800" loading="lazy">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium truncate" x-text="track.album"></p>
+                                <p class="text-zinc-500 text-sm truncate" x-text="track.artist"></p>
+                            </div>
+                            <div x-show="track.downloaded" class="text-green-500">
+                                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- 教程区域 -->
+    <section class="py-20 relative">
+        <div class="max-w-4xl mx-auto px-6">
+            <div class="text-center mb-16 scroll-animate">
+                <h2 class="heading text-4xl md:text-5xl mb-4" x-text="t.tutorialTitle">Set Up Your Album Wall</h2>
+                <p class="text-zinc-400 text-lg" x-text="t.tutorialSubtitle">Transform your Mac's lock screen into a stunning music gallery</p>
+            </div>
+            
+            <!-- 步骤 -->
+            <div class="space-y-8">
+                <!-- Step 1 -->
+                <div class="scroll-animate glass-card rounded-2xl p-8 flex flex-col md:flex-row items-start gap-6">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shrink-0">
+                        <span class="text-2xl font-bold font-mono">1</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2" x-text="t.step1Title">Open System Settings</h3>
+                        <p class="text-zinc-400 leading-relaxed" x-text="t.step1Desc"></p>
+                    </div>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="scroll-animate glass-card rounded-2xl p-8 flex flex-col md:flex-row items-start gap-6" style="transition-delay: 0.1s;">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shrink-0">
+                        <span class="text-2xl font-bold font-mono">2</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2" x-text="t.step2Title">Navigate to Screen Saver</h3>
+                        <p class="text-zinc-400 leading-relaxed" x-text="t.step2Desc"></p>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="scroll-animate glass-card rounded-2xl p-8 flex flex-col md:flex-row items-start gap-6" style="transition-delay: 0.2s;">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center shrink-0">
+                        <span class="text-2xl font-bold font-mono">3</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2" x-text="t.step3Title">Select Photo Grid</h3>
+                        <p class="text-zinc-400 leading-relaxed" x-text="t.step3Desc"></p>
+                    </div>
+                </div>
+                
+                <!-- Step 4 -->
+                <div class="scroll-animate glass-card rounded-2xl p-8 flex flex-col md:flex-row items-start gap-6" style="transition-delay: 0.3s;">
+                    <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-600 to-orange-600 flex items-center justify-center shrink-0">
+                        <span class="text-2xl font-bold font-mono">4</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2" x-text="t.step4Title">Add Your Album Covers</h3>
+                        <p class="text-zinc-400 leading-relaxed" x-text="t.step4Desc"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 效果预览提示 -->
+            <div class="scroll-animate mt-12 text-center" style="transition-delay: 0.4s;">
+                <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full glass-card">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-amber-400"></i>
+                    <span class="text-zinc-300" x-text="t.proTip"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="py-12 border-t border-white/5">
+        <div class="max-w-4xl mx-auto px-6 text-center">
+            <div class="flex items-center justify-center gap-6 mb-6">
+                <a href="https://github.com/JaffryGao/YTM-Album-Cover-Downloader" target="_blank" class="text-zinc-500 hover:text-white transition-colors flex items-center gap-2">
+                    <i data-lucide="github" class="w-5 h-5"></i>
+                    <span>GitHub</span>
+                </a>
+            </div>
+            <p class="text-zinc-600 text-sm" x-text="t.footer"></p>
+        </div>
+    </footer>
+    
+    <script>
+        function app() {
+            return {
+                lang: 'en',
+                playlistInput: '',
+                loading: false,
+                downloading: false,
+                downloadProgress: 0,
+                tracks: [],
+                playlistName: '',
+                error: '',
+                
+                translations: {
+                    en: {
+                        title: 'YTM Album Cover Downloader',
+                        metaDesc: 'Download high-resolution album covers from YouTube Music playlists for your macOS screensaver.',
+                        brand: 'YTM Covers',
+                        headline: 'Album Art for Your Desktop',
+                        subheadline: 'Download high-resolution album covers from your YouTube Music playlists. Perfect for macOS screensavers.',
+                        placeholder: 'Paste your public YouTube Music playlist URL...',
+                        downloadBtn: 'Download',
+                        processing: 'Processing...',
+                        hint: 'Only public playlists are supported. Private playlists require authentication.',
+                        albums: 'albums',
+                        downloading: 'Downloading covers...',
+                        doNotClose: 'Please do not close this page until the download completes.',
+                        tutorialTitle: 'Set Up Your Album Wall',
+                        tutorialSubtitle: 'Transform your Mac\'s lock screen into a stunning music gallery',
+                        step1Title: 'Open System Settings',
+                        step1Desc: 'Click the Apple menu  in the top-left corner and select "System Settings" (or "System Preferences" on older macOS).',
+                        step2Title: 'Navigate to Screen Saver',
+                        step2Desc: 'In the sidebar, click "Screen Saver" (under "Appearance" section on macOS Sonoma and later).',
+                        step3Title: 'Select Photo Grid',
+                        step3Desc: 'Choose "Shuffle Photos" or scroll down to find the album grid/mosaic style screensaver options.',
+                        step4Title: 'Add Your Album Covers',
+                        step4Desc: 'Click "Choose Folder" and select the folder where you extracted the downloaded album covers. Your lock screen will now display a beautiful album wall!',
+                        proTip: 'Pro tip: Create a dedicated folder in Pictures for your album covers to keep them organized.',
+                        footer: 'Built with ❤️ for music lovers. Powered by ytmusicapi.',
+                        errorFetch: 'Failed to fetch playlist. Please check the URL and try again.',
+                        errorInvalid: 'Invalid playlist URL. Please paste a valid YouTube Music playlist link.',
+                        complete: 'Download complete! Check your downloads folder.',
+                    },
+                    cn: {
+                        title: 'YTM 专辑封面下载器',
+                        metaDesc: '从 YouTube Music 播放列表下载高清专辑封面，用于 macOS 锁屏屏保。',
+                        brand: 'YTM 封面',
+                        headline: '为你的桌面打造专辑墙',
+                        subheadline: '从 YouTube Music 播放列表批量下载高清专辑封面，完美适配 macOS 锁屏屏保。',
+                        placeholder: '粘贴你的公开 YouTube Music 播放列表链接...',
+                        downloadBtn: '下载',
+                        processing: '处理中...',
+                        hint: '仅支持公开播放列表，私人播放列表需要登录认证。',
+                        albums: '张专辑',
+                        downloading: '正在下载封面...',
+                        doNotClose: '下载完成前请不要关闭此页面。',
+                        tutorialTitle: '设置你的专辑墙屏保',
+                        tutorialSubtitle: '把你的 Mac 锁屏变成一座迷人的音乐画廊',
+                        step1Title: '打开系统设置',
+                        step1Desc: '点击左上角  苹果菜单，选择「系统设置」（旧版 macOS 为「系统偏好设置」）。',
+                        step2Title: '进入屏幕保护程序',
+                        step2Desc: '在侧边栏点击「屏幕保护程序」（macOS Sonoma 及以上版本在「外观」分类下）。',
+                        step3Title: '选择照片网格',
+                        step3Desc: '选择「随机显示照片」或向下滚动找到专辑网格/马赛克风格的屏保选项。',
+                        step4Title: '添加你的专辑封面',
+                        step4Desc: '点击「选取文件夹」，选择你解压专辑封面的文件夹。搞定！你的锁屏现在会显示一面美丽的专辑墙！',
+                        proTip: '建议：在「图片」文件夹中创建一个专门的子文件夹来存放专辑封面。',
+                        footer: '为音乐爱好者用 ❤️ 打造，由 ytmusicapi 驱动。',
+                        errorFetch: '获取播放列表失败，请检查链接后重试。',
+                        errorInvalid: '无效的播放列表链接，请粘贴正确的 YouTube Music 播放列表链接。',
+                        complete: '下载完成！请检查你的下载文件夹。',
+                    }
+                },
+                
+                get t() {
+                    return this.translations[this.lang];
+                },
+                
+                toggleLang() {
+                    this.lang = this.lang === 'en' ? 'cn' : 'en';
+                },
+                
+                extractPlaylistId(input) {
+                    // 支持多种格式：完整 URL、短链接、纯 ID
+                    const patterns = [
+                        /[?&]list=([a-zA-Z0-9_-]+)/,
+                        /^(PL[a-zA-Z0-9_-]+)$/,
+                        /^(RDCLAK[a-zA-Z0-9_-]+)$/,
+                        /^(OLAK[a-zA-Z0-9_-]+)$/,
+                    ];
+                    
+                    for (const pattern of patterns) {
+                        const match = input.match(pattern);
+                        if (match) return match[1];
+                    }
+                    return null;
+                },
+                
+                async fetchPlaylist() {
+                    this.error = '';
+                    this.tracks = [];
+                    
+                    const playlistId = this.extractPlaylistId(this.playlistInput.trim());
+                    if (!playlistId) {
+                        this.error = this.t.errorInvalid;
+                        return;
+                    }
+                    
+                    this.loading = true;
+                    
+                    try {
+                        const response = await fetch(`/api/playlist?id=${playlistId}`);
+                        const data = await response.json();
+                        
+                        if (!data.success) {
+                            throw new Error(data.error || 'Unknown error');
+                        }
+                        
+                        this.playlistName = data.playlist_name;
+                        this.tracks = data.covers.map(c => ({
+                            ...c,
+                            thumbnail: c.url.replace(/w\d+-h\d+/, 'w120-h120'),
+                            downloaded: false
+                        }));
+                        
+                        // 开始下载
+                        this.startDownload(data.covers);
+                        
+                    } catch (err) {
+                        console.error(err);
+                        this.error = this.t.errorFetch;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async startDownload(covers) {
+                    this.downloading = true;
+                    this.downloadProgress = 0;
+                    
+                    const zip = new JSZip();
+                    const total = covers.length;
+                    let completed = 0;
+                    
+                    // 并发控制：最多同时下载 5 张
+                    const concurrency = 5;
+                    const queue = [...covers];
+                    
+                    const downloadOne = async (cover, index) => {
+                        try {
+                            // 使用代理绕过 CORS
+                            const proxyUrl = `/api/proxy?url=${encodeURIComponent(cover.url)}`;
+                            const response = await fetch(proxyUrl);
+                            
+                            if (response.ok) {
+                                const blob = await response.blob();
+                                const filename = `${cover.artist} - ${cover.album}.jpg`
+                                    .replace(/[\/\\:*?"<>|]/g, '_');
+                                zip.file(filename, blob);
+                                
+                                // 更新 UI
+                                const trackIndex = this.tracks.findIndex(t => 
+                                    t.artist === cover.artist && t.album === cover.album
+                                );
+                                if (trackIndex !== -1) {
+                                    this.tracks[trackIndex].downloaded = true;
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Failed to download: ${cover.album}`, err);
+                        }
+                        
+                        completed++;
+                        this.downloadProgress = Math.round((completed / total) * 100);
+                    };
+                    
+                    // 分批执行
+                    for (let i = 0; i < covers.length; i += concurrency) {
+                        const batch = covers.slice(i, i + concurrency);
+                        await Promise.all(batch.map((c, idx) => downloadOne(c, i + idx)));
+                    }
+                    
+                    // 生成并下载 ZIP
+                    const content = await zip.generateAsync({ type: 'blob' });
+                    saveAs(content, 'ytm-album-covers.zip');
+                    
+                    this.downloading = false;
+                    alert(this.t.complete);
+                },
+                
+                init() {
+                    // 滚动动画
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                entry.target.classList.add('visible');
+                            }
+                        });
+                    }, { threshold: 0.1 });
+                    
+                    document.querySelectorAll('.scroll-animate').forEach(el => {
+                        observer.observe(el);
+                    });
+                    
+                    // 初始化 Lucide 图标
+                    lucide.createIcons();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
