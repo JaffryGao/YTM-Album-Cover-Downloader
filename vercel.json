@@ -1,26 +1,12 @@
 {
-    "builds": [
+    "rewrites": [
         {
-            "src": "api/proxy.py",
-            "use": "@vercel/python"
+            "source": "/api/proxy",
+            "destination": "/api/proxy"
         },
         {
-            "src": "api/playlist.py",
-            "use": "@vercel/python"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/api/proxy",
-            "dest": "/api/proxy.py"
-        },
-        {
-            "src": "/api/playlist",
-            "dest": "/api/playlist.py"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/index.html"
+            "source": "/api/playlist",
+            "destination": "/api/playlist"
         }
     ]
 }
