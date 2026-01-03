@@ -640,21 +640,57 @@
 
                     console.log(`下载完成: ${successCount} 成功, ${errorCount} 失败`);
 
-                    // 生成并下载 ZIP (使用 base64 绕过下载管理器拦截)
-                    const content = await zip.generateAsync({ type: 'base64' });
+                    if (successCount === 0) {
+                        alert('下载失败，没有成功获取任何封面图片');
+                        this.downloading = false;
+                        return;
+                    }
 
-                    // 构建 data URL
-                    const dataUrl = 'data:application/zip;base64,' + content;
-                    const a = document.createElement('a');
-                    a.href = dataUrl;
-                    a.download = 'ytm-album-covers.zip';
-                    a.style.display = 'none';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    // 生成 ZIP 文件
+                    console.log('正在生成 ZIP 文件...');
+                    const blob = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'DEFLATE',
+                        compressionOptions: { level: 6 }
+                    });
+                    console.log(`ZIP 文件大小: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+
+                    // 创建下载 - 使用更可靠的方式
+                    const filename = `ytm-album-covers-${Date.now()}.zip`;
+
+                    // 方法1: 使用 window.navigator.msSaveBlob (IE/Edge)
+                    if (window.navigator && window.navigator.msSaveBlob) {
+                        window.navigator.msSaveBlob(blob, filename);
+                        console.log('使用 msSaveBlob 下载');
+                    }
+                    // 方法2: 创建隐藏的 iframe 下载
+                    else {
+                        const url = URL.createObjectURL(blob);
+
+                        // 创建隐藏的 iframe
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        document.body.appendChild(iframe);
+
+                        // 在 iframe 中创建下载链接
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const link = iframeDoc.createElement('a');
+                        link.href = url;
+                        link.download = filename;
+                        iframeDoc.body.appendChild(link);
+                        link.click();
+
+                        // 清理
+                        setTimeout(() => {
+                            document.body.removeChild(iframe);
+                            URL.revokeObjectURL(url);
+                        }, 5000);
+
+                        console.log('使用 iframe 方式下载');
+                    }
 
                     this.downloading = false;
-                    alert(this.t.complete);
+                    alert(this.t.complete + `\n文件名: ${filename}`);
                 },
 
                 init() {
