@@ -16,9 +16,6 @@
     <!-- JSZip -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
-    <!-- FileSaver -->
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -601,7 +598,16 @@
 
                     // 生成并下载 ZIP
                     const content = await zip.generateAsync({ type: 'blob' });
-                    saveAs(content, 'ytm-album-covers.zip');
+
+                    // 使用原生下载方式，确保文件名正确
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ytm-album-covers.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
 
                     this.downloading = false;
                     alert(this.t.complete);
