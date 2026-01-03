@@ -156,6 +156,33 @@
             }
         }
 
+        /* 歌单列表容器 */
+        .track-list-container {
+            position: relative;
+        }
+
+        /* 底部渐变阴影提示 */
+        .track-list-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(to top, rgba(9, 9, 11, 0.95), transparent);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* 滚动缩放效果 */
+        .track-scroller {
+            scroll-behavior: smooth;
+        }
+
+        .track-scroller .track-item {
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
         /* 隐藏滚动条 */
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
@@ -285,32 +312,10 @@
                     </p>
                 </div>
 
-                <!-- 歌曲列表 -->
-                <div class="max-h-80 overflow-y-auto hide-scrollbar space-y-2 mb-6">
-                    <template x-for="(track, index) in tracks" :key="index">
-                        <div class="track-item flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-all"
-                            :style="`animation-delay: ${index * 50}ms`">
-                            <img :src="track.thumbnail" class="w-12 h-12 rounded-lg object-cover bg-zinc-800"
-                                loading="lazy">
-                            <div class="flex-1 min-w-0">
-                                <p class="font-medium truncate" x-text="track.album"></p>
-                                <p class="text-zinc-500 text-sm truncate" x-text="track.artist"></p>
-                            </div>
-                            <div x-show="track.downloaded" class="text-green-500">
-                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- 下载按钮 -->
-                <div x-show="tracks.length > 0 && !downloading" class="flex justify-center">
+                <!-- 下载按钮 - 移到列表上方 -->
+                <div x-show="tracks.length > 0 && !downloading" class="flex justify-center mb-6">
                     <button @click="startDownload(covers)"
-                        class="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-xl font-medium transition-all flex items-center justify-center gap-2">
+                        class="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-600/20">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -318,6 +323,31 @@
                         </svg>
                         <span x-text="t.downloadBtn">Download</span>
                     </button>
+                </div>
+
+                <!-- 歌曲列表 - 显示4.5行并有底部阴影 -->
+                <div class="track-list-container">
+                    <div class="track-scroller overflow-y-auto hide-scrollbar space-y-2" style="max-height: 340px;"
+                        x-ref="trackScroller">
+                        <template x-for="(track, index) in tracks" :key="index">
+                            <div class="track-item flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-all"
+                                :style="`animation-delay: ${index * 30}ms`">
+                                <img :src="track.thumbnail"
+                                    class="w-14 h-14 rounded-lg object-cover bg-zinc-800 shrink-0" loading="lazy">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium truncate" x-text="track.album"></p>
+                                    <p class="text-zinc-500 text-sm truncate" x-text="track.artist"></p>
+                                </div>
+                                <div x-show="track.downloaded" class="text-green-500 shrink-0">
+                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>
@@ -596,18 +626,18 @@
                         await Promise.all(batch.map((c, idx) => downloadOne(c, i + idx)));
                     }
 
-                    // 生成并下载 ZIP
-                    const content = await zip.generateAsync({ type: 'blob' });
+                    // 生成并下载 ZIP (使用 base64 绕过下载管理器拦截)
+                    const content = await zip.generateAsync({ type: 'base64' });
 
-                    // 使用原生下载方式，确保文件名正确
-                    const url = URL.createObjectURL(content);
+                    // 构建 data URL
+                    const dataUrl = 'data:application/zip;base64,' + content;
                     const a = document.createElement('a');
-                    a.href = url;
+                    a.href = dataUrl;
                     a.download = 'ytm-album-covers.zip';
+                    a.style.display = 'none';
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
 
                     this.downloading = false;
                     alert(this.t.complete);
