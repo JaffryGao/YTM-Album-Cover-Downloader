@@ -192,6 +192,35 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        /* 推荐歌单卡片光效 */
+        .playlist-card {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .playlist-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.3);
+        }
+
+        .playlist-card .glow-effect {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        .playlist-card:hover .glow-effect {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -247,7 +276,7 @@
                             @keyup.enter="fetchPlaylist()"
                             class="w-full pl-12 pr-4 py-4 bg-zinc-900/50 border border-white/10 rounded-xl text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all">
                     </div>
-                    <button @click="fetchPlaylist()" :disabled="loading || tracks.length > 0"
+                    <button @click="resetAndFetch()" :disabled="loading || downloading || packing"
                         class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]">
                         <template x-if="!loading">
                             <span class="flex items-center gap-2">
@@ -278,6 +307,40 @@
                     <i data-lucide="info" class="w-4 h-4"></i>
                     <span x-text="t.hint"></span>
                 </p>
+            </div>
+
+            <!-- 推荐歌单区域 -->
+            <div x-show="tracks.length === 0 && !loading" class="mb-8 animate-slide-up" style="animation-delay: 0.4s;">
+                <h3 class="text-center text-zinc-400 text-sm uppercase tracking-wider mb-6" x-text="t.recommendTitle">
+                    Popular Playlists
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <template x-for="(playlist, index) in recommendedPlaylists" :key="index">
+                        <div class="playlist-card glass-card rounded-xl p-4 cursor-pointer"
+                            @click="loadRecommendedPlaylist(playlist)" @mousemove="handleCardMouseMove($event, $el)"
+                            @mouseleave="handleCardMouseLeave($el)">
+                            <!-- 光效层 -->
+                            <div class="glow-effect"></div>
+                            <!-- 封面 -->
+                            <div class="relative mb-3 aspect-square rounded-lg overflow-hidden bg-zinc-800">
+                                <img :src="playlist.cover" :alt="playlist.name" class="w-full h-full object-cover"
+                                    loading="lazy">
+                                <!-- 悬停遮罩 -->
+                                <div
+                                    class="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <!-- 名称和歌曲数 -->
+                            <h4 class="font-medium text-sm truncate mb-1" x-text="playlist.name"></h4>
+                            <p class="text-zinc-500 text-xs" x-text="playlist.count + ' ' + t.albums"></p>
+                        </div>
+                    </template>
+                </div>
             </div>
 
             <!-- 错误提示 -->
@@ -472,6 +535,40 @@
                 zipBlob: null,
                 zipFilename: '',
 
+                // 推荐歌单
+                recommendedPlaylists: [
+                    {
+                        id: 'PL0To3D4RRFY6LdahUQPukYiuu1I16eMld',
+                        name: 'Chill Vibes',
+                        cover: 'https://lh3.googleusercontent.com/LI44DWL2hk0C6PQVBGNPMYSLjPYAkh5CnWEsB-0_x-xgadYBjqXiH3u9L7nDYZBSQzlX-a7mKxQ=w226-h226-l90-rj',
+                        count: 50
+                    },
+                    {
+                        id: 'PLOHoVaTp8R7dfrJW5pumS0iD_dhlXKv17',
+                        name: 'Workout Mix',
+                        cover: 'https://lh3.googleusercontent.com/F2l6x6mGJxvwTQh7Kuh9CQ_2lLIxz5qp8T3H9LLhB3G6k_lF2wQQIQYJd5w9YINRN7aB9MdF6hw=w226-h226-l90-rj',
+                        count: 75
+                    },
+                    {
+                        id: 'PLj3yHoINc17ve9DMQpyU_clEGETrKSrbD',
+                        name: 'Pop Hits',
+                        cover: 'https://lh3.googleusercontent.com/n3qOnfTTJxEPq_3FdH8RWqJVJqJxJN_4Wn9CdN-4Dg9mIwNZ3i_x6kE7l8D3aX5rHjL2C5r7Qxc=w226-h226-l90-rj',
+                        count: 100
+                    },
+                    {
+                        id: 'PL4fGSI1pDJn6O1LS0XSdF3RyO0Rq_LDeI',
+                        name: 'Classic Rock',
+                        cover: 'https://lh3.googleusercontent.com/KL_kB5Tc0_B5sJjFaW8iGnxTgEn4mvHvMxLj6D4Gk_5rNwIa0y_mK7Rq8uJHy9WT2vP6aHmOyX4=w226-h226-l90-rj',
+                        count: 80
+                    },
+                    {
+                        id: 'RDCLAK5uy_kdleYRgJfVdtXtDEkPne9S9UPQnNL_6K0',
+                        name: 'Top Charts',
+                        cover: 'https://lh3.googleusercontent.com/x_9DYvMQQpLhzJB8qRdN3E9_3C8LjqQx2vnOo5i7Jt4rPnMeW5_S7bH6Xt9dKc6yJL3N8TmA4w0=w226-h226-l90-rj',
+                        count: 120
+                    }
+                ],
+
                 translations: {
                     en: {
                         title: 'YTM Album Cover Downloader',
@@ -484,6 +581,7 @@
                         fetching: 'Fetching...',
                         downloadBtn: 'Download All',
                         hint: 'Only public playlists are supported. Private playlists require authentication.',
+                        recommendTitle: 'Popular Playlists',
                         albums: 'albums',
                         downloading: 'Downloading covers...',
                         packing: 'Generating ZIP file...',
@@ -516,6 +614,7 @@
                         fetching: '获取中...',
                         downloadBtn: '下载全部',
                         hint: '仅支持公开播放列表，私人播放列表需要登录认证。',
+                        recommendTitle: '热门歌单推荐',
                         albums: '张专辑',
                         downloading: '正在下载封面...',
                         packing: '正在生成压缩包...',
@@ -561,6 +660,43 @@
                         if (match) return match[1];
                     }
                     return null;
+                },
+
+                // 重置状态并获取新歌单
+                resetAndFetch() {
+                    this.tracks = [];
+                    this.covers = [];
+                    this.zipBlob = null;
+                    this.zipFilename = '';
+                    this.downloadProgress = 0;
+                    this.error = '';
+                    this.fetchPlaylist();
+                },
+
+                // 加载推荐歌单
+                loadRecommendedPlaylist(playlist) {
+                    this.playlistInput = `https://music.youtube.com/playlist?list=${playlist.id}`;
+                    this.resetAndFetch();
+                },
+
+                // 处理卡片鼠标移动光效
+                handleCardMouseMove(event, el) {
+                    const rect = el.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const glow = el.querySelector('.glow-effect');
+                    if (glow) {
+                        glow.style.left = x + 'px';
+                        glow.style.top = y + 'px';
+                    }
+                },
+
+                // 处理卡片鼠标离开
+                handleCardMouseLeave(el) {
+                    const glow = el.querySelector('.glow-effect');
+                    if (glow) {
+                        glow.style.opacity = '0';
+                    }
                 },
 
                 async fetchPlaylist() {
