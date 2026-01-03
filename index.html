@@ -297,24 +297,29 @@
                 </div>
 
                 <!-- 进度条 -->
-                <div x-show="downloading" class="mb-6">
+                <div x-show="downloading || packing" class="mb-6">
                     <div class="flex items-center justify-between text-sm mb-2">
-                        <span class="text-zinc-400" x-text="t.downloading"></span>
-                        <span class="text-indigo-400" x-text="`${downloadProgress}%`"></span>
+                        <span class="text-zinc-400" x-text="packing ? t.packing : t.downloading"></span>
+                        <span class="text-indigo-400" x-text="packing ? '100%' : `${downloadProgress}%`"></span>
                     </div>
                     <div class="h-2 bg-zinc-800 rounded-full overflow-hidden">
                         <div class="progress-bar h-full rounded-full transition-all duration-300"
-                            :style="`width: ${downloadProgress}%`"></div>
+                            :style="`width: ${packing ? 100 : downloadProgress}%`"></div>
                     </div>
                     <p class="text-zinc-500 text-sm mt-3 flex items-center gap-2">
-                        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+                        <svg class="w-4 h-4 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
                         <span x-text="t.doNotClose"></span>
                     </p>
                 </div>
 
-                <!-- 下载按钮 - 移到列表上方 -->
-                <div x-show="tracks.length > 0 && !downloading" class="flex justify-center mb-6">
-                    <button @click="startDownload(covers)"
+                <!-- 下载按钮 -->
+                <div x-show="tracks.length > 0 && !downloading && !packing" class="flex justify-center gap-4 mb-6">
+                    <!-- 首次下载按钮 -->
+                    <button x-show="!zipBlob" @click="startDownload(covers)"
                         class="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-600/20">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" stroke-width="2">
@@ -322,6 +327,17 @@
                                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                         <span x-text="t.downloadBtn">Download</span>
+                    </button>
+
+                    <!-- 重新下载按钮 (仅在 zipBlob 存在时显示) -->
+                    <button x-show="zipBlob" @click="redownloadZip()"
+                        class="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span x-text="t.redownload">Download Again</span>
                     </button>
                 </div>
 
@@ -447,11 +463,14 @@
                 playlistInput: '',
                 loading: false,
                 downloading: false,
+                packing: false,
                 downloadProgress: 0,
                 tracks: [],
                 covers: [],
                 playlistName: '',
                 error: '',
+                zipBlob: null,
+                zipFilename: '',
 
                 translations: {
                     en: {
@@ -467,7 +486,9 @@
                         hint: 'Only public playlists are supported. Private playlists require authentication.',
                         albums: 'albums',
                         downloading: 'Downloading covers...',
+                        packing: 'Generating ZIP file...',
                         doNotClose: 'Please do not close this page until the download completes.',
+                        redownload: 'Download Again',
                         tutorialTitle: 'Set Up Your Album Wall',
                         tutorialSubtitle: 'Transform your Mac\'s lock screen into a stunning music gallery',
                         step1Title: 'Open System Settings',
@@ -497,7 +518,9 @@
                         hint: '仅支持公开播放列表，私人播放列表需要登录认证。',
                         albums: '张专辑',
                         downloading: '正在下载封面...',
+                        packing: '正在生成压缩包...',
                         doNotClose: '下载完成前请不要关闭此页面。',
+                        redownload: '重新下载',
                         tutorialTitle: '设置你的专辑墙屏保',
                         tutorialSubtitle: '把你的 Mac 锁屏变成一座迷人的音乐画廊',
                         step1Title: '打开系统设置',
@@ -646,6 +669,10 @@
                         return;
                     }
 
+                    // 切换到打包状态
+                    this.downloading = false;
+                    this.packing = true;
+
                     // 生成 ZIP 文件
                     console.log('正在生成 ZIP 文件...');
                     const blob = await zip.generateAsync({
@@ -655,42 +682,42 @@
                     });
                     console.log(`ZIP 文件大小: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
 
-                    // 创建下载 - 使用更可靠的方式
+                    // 保存 blob 供重新下载
                     const filename = `ytm-album-covers-${Date.now()}.zip`;
+                    this.zipBlob = blob;
+                    this.zipFilename = filename;
 
-                    // 方法1: 使用 window.navigator.msSaveBlob (IE/Edge)
-                    if (window.navigator && window.navigator.msSaveBlob) {
-                        window.navigator.msSaveBlob(blob, filename);
-                        console.log('使用 msSaveBlob 下载');
+                    this.packing = false;
+
+                    // 触发下载
+                    this.triggerDownload(blob, filename);
+
+                    alert(this.t.complete + `\n\n文件名: ${filename}\n\n如果下载没有开始，请点击"重新下载"按钮`);
+                },
+
+                // 重新下载 ZIP
+                redownloadZip() {
+                    if (this.zipBlob && this.zipFilename) {
+                        this.triggerDownload(this.zipBlob, this.zipFilename);
                     }
-                    // 方法2: 创建隐藏的 iframe 下载
-                    else {
-                        const url = URL.createObjectURL(blob);
+                },
 
-                        // 创建隐藏的 iframe
-                        const iframe = document.createElement('iframe');
-                        iframe.style.display = 'none';
-                        document.body.appendChild(iframe);
+                // 触发下载的通用方法
+                triggerDownload(blob, filename) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
 
-                        // 在 iframe 中创建下载链接
-                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                        const link = iframeDoc.createElement('a');
-                        link.href = url;
-                        link.download = filename;
-                        iframeDoc.body.appendChild(link);
-                        link.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 1000);
 
-                        // 清理
-                        setTimeout(() => {
-                            document.body.removeChild(iframe);
-                            URL.revokeObjectURL(url);
-                        }, 5000);
-
-                        console.log('使用 iframe 方式下载');
-                    }
-
-                    this.downloading = false;
-                    alert(this.t.complete + `\n文件名: ${filename}`);
+                    console.log('触发下载:', filename);
                 },
 
                 init() {
