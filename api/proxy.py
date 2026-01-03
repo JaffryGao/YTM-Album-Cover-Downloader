@@ -1,7 +1,7 @@
-import json
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
-from urllib.request import urlopen, Request
+import urllib.request
+import base64
 
 
 class handler(BaseHTTPRequestHandler):
@@ -19,35 +19,35 @@ class handler(BaseHTTPRequestHandler):
         
         if not image_url:
             self.send_response(400)
-            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({
-                'error': 'Missing url parameter'
-            }).encode())
+            self.wfile.write(b'Missing url parameter')
             return
         
         # 验证 URL 是否来自 Google (安全检查)
         if not image_url.startswith('https://lh3.googleusercontent.com/'):
             self.send_response(403)
-            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({
-                'error': 'Only Google image URLs are allowed'
-            }).encode())
+            self.wfile.write(b'Only Google image URLs are allowed')
             return
         
         try:
             # 请求图片
-            req = Request(image_url, headers={
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-            })
-            response = urlopen(req, timeout=30)
-            image_data = response.read()
-            content_type = response.headers.get('Content-Type', 'image/jpeg')
+            req = urllib.request.Request(
+                image_url, 
+                headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'}
+            )
+            with urllib.request.urlopen(req, timeout=30) as response:
+                image_data = response.read()
+                content_type = response.headers.get('Content-Type', 'image/jpeg')
             
             # 返回图片
             self.send_response(200)
             self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(image_data)))
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Cache-Control', 'public, max-age=86400')
             self.end_headers()
@@ -55,9 +55,15 @@ class handler(BaseHTTPRequestHandler):
             
         except Exception as e:
             self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Type', 'text/plain')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps({
-                'error': str(e)
-            }).encode())
+            self.wfile.write(f'Error: {str(e)}'.encode('utf-8'))
+    
+    def do_OPTIONS(self):
+        # 处理 CORS 预检请求
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', '*')
+        self.end_headers()

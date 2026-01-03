@@ -588,21 +588,27 @@
                     const total = covers.length;
                     let completed = 0;
 
-                    // 并发控制：最多同时下载 5 张
-                    const concurrency = 5;
-                    const queue = [...covers];
+                    // 并发控制：最多同时下载 3 张 (减少并发避免超时)
+                    const concurrency = 3;
+                    let successCount = 0;
+                    let errorCount = 0;
 
                     const downloadOne = async (cover, index) => {
                         try {
                             // 使用代理绕过 CORS
                             const proxyUrl = `/api/proxy?url=${encodeURIComponent(cover.url)}`;
+                            console.log(`[${index + 1}/${total}] 下载: ${cover.album}`);
+
                             const response = await fetch(proxyUrl);
 
                             if (response.ok) {
                                 const blob = await response.blob();
+                                console.log(`[${index + 1}/${total}] 成功: ${cover.album} (${(blob.size / 1024).toFixed(1)} KB)`);
+
                                 const filename = `${cover.artist} - ${cover.album}.jpg`
                                     .replace(/[\/\\:*?"<>|]/g, '_');
                                 zip.file(filename, blob);
+                                successCount++;
 
                                 // 更新 UI
                                 const trackIndex = this.tracks.findIndex(t =>
@@ -611,9 +617,14 @@
                                 if (trackIndex !== -1) {
                                     this.tracks[trackIndex].downloaded = true;
                                 }
+                            } else {
+                                const errorText = await response.text();
+                                console.error(`[${index + 1}/${total}] 失败: ${cover.album} - ${response.status} ${errorText}`);
+                                errorCount++;
                             }
                         } catch (err) {
-                            console.error(`Failed to download: ${cover.album}`, err);
+                            console.error(`[${index + 1}/${total}] 错误: ${cover.album}`, err);
+                            errorCount++;
                         }
 
                         completed++;
@@ -621,10 +632,13 @@
                     };
 
                     // 分批执行
+                    console.log(`开始下载 ${total} 张封面...`);
                     for (let i = 0; i < covers.length; i += concurrency) {
                         const batch = covers.slice(i, i + concurrency);
                         await Promise.all(batch.map((c, idx) => downloadOne(c, i + idx)));
                     }
+
+                    console.log(`下载完成: ${successCount} 成功, ${errorCount} 失败`);
 
                     // 生成并下载 ZIP (使用 base64 绕过下载管理器拦截)
                     const content = await zip.generateAsync({ type: 'base64' });
